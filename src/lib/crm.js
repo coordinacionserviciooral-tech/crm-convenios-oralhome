@@ -99,14 +99,12 @@ export function agreementPayload(data) {
       return [year, number];
     }),
   );
-  payload.actividades = (data.actividades || [])
-    .map((a) => ({
-      ...a,
-      fecha: a.fecha || "",
-      nota: String(a.nota ?? "").trim(),
-      cumplida: Boolean(a.cumplida),
-    }))
-    .filter((a) => a.fecha || a.nota);
+  payload.actividades = (data.actividades || []).map((a) => ({
+    ...a,
+    fecha: a.fecha || "",
+    nota: String(a.nota ?? "").trim(),
+    cumplida: Boolean(a.cumplida),
+  }));
   if (payload.actividades.some((a) => a.fecha && !validDate(a.fecha)))
     throw new Error("Revisa las fechas de seguimiento.");
   return payload;
