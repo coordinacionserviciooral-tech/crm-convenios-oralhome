@@ -22,6 +22,7 @@ import {
 import Agreement from "./Agreement";
 import AgreementEditor from "./AgreementEditor";
 import AdminPanel from "./AdminPanel";
+import MetricIcon from "./MetricIcon";
 import { PasswordForm } from "./Auth";
 
 export default function Dashboard({ profile, signOut }) {
@@ -356,12 +357,26 @@ export default function Dashboard({ profile, signOut }) {
         </section>
       ) : (
         <main>
+          <section className="overview" aria-label="Resumen de gestión">
+            <div>
+              <p className="eyebrow">ORALHOME · RELACIONES CORPORATIVAS</p>
+              <h2>Gestión de convenios</h2>
+              <p className="muted">
+                Organizaciones, tarifas y seguimientos en un solo lugar.
+              </p>
+            </div>
+            <span className="overview-label">
+              <span aria-hidden="true" />
+              Vista general
+            </span>
+          </section>
           <div className="kpis">
             <button
               className="kpi"
               aria-pressed={metric === "convenios"}
               onClick={() => home()}
             >
+              <MetricIcon type="convenios" />
               <b>{active.length}</b>
               <span>Convenios activos</span>
             </button>
@@ -370,6 +385,7 @@ export default function Dashboard({ profile, signOut }) {
               aria-pressed={metric === "organizaciones"}
               onClick={() => home("organizaciones")}
             >
+              <MetricIcon type="organizaciones" />
               <b>
                 {
                   new Set(
@@ -384,6 +400,7 @@ export default function Dashboard({ profile, signOut }) {
               aria-pressed={metric === "pendientes"}
               onClick={() => home("pendientes")}
             >
+              <MetricIcon type="pendientes" />
               <b>{pending.length}</b>
               <span>Seguimientos pendientes</span>
             </button>
@@ -392,6 +409,7 @@ export default function Dashboard({ profile, signOut }) {
               aria-pressed={metric === "vencidos"}
               onClick={() => home("vencidos")}
             >
+              <MetricIcon type="vencidos" />
               <b className="overdue">
                 {pending.filter((a) => a.fecha && a.fecha < today).length}
               </b>
