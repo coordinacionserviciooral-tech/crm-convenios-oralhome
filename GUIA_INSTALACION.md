@@ -170,6 +170,8 @@ El Respaldo de datos JSON contiene convenios y referencias, categorías y descri
 
 ## Alertas diarias por resumen
 
+El seguimiento de renovación inicia con los ciclos de octubre de 2026 en adelante. Los ciclos anteriores no se convierten automáticamente en pendientes históricos al activar las alertas. Se respeta la ventana de dos meses: por ejemplo, el 8 de octubre pueden entrar octubre, noviembre y diciembre; enero de 2027 entra el 1 de noviembre. Un ciclo válido continúa diariamente después de su fecha hasta registrar un cambio de tarifa. Esta base de inicio permanece fija; no debe adelantarse cada mes, pues se perderían pendientes reales.
+
 Aplicar `supabase/renewal-alerts.sql`, desplegar la función y ejecutar `supabase/cron.sql`. Solo dos trabajos: 13:00 y 20:00 UTC (08:00 y 15:00 Colombia). Un correo resumen por horario a coordinadordeservicio@oralhome.com.co, solo cuando existan pendientes. Renovaciones: desde dos meses antes, diariamente incluso vencidas; una tarifa agregada o un valor cambiado registra la revisión en el servidor y detiene el ciclo hasta el próximo año. Cambiar contacto o eliminar años no resuelve la renovación. Seguimientos: desde ocho días de lunes a viernes antes hasta cumplirse, sin festivos. Gestión: 8/3/1 días calendario. Fallos registrados; se incluyen pendientes vigentes en el siguiente horario. No hay reintentos de correo entre horarios. Sin fecha no se puede calcular anticipación.
 
 

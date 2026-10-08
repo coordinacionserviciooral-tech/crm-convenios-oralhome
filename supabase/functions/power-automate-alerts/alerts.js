@@ -13,6 +13,10 @@ const MONTHS = [
   "Diciembre",
 ];
 const DAY = 86400000;
+// Tracking began in October 2026. Earlier renewals have no reliable pending
+// status and must not become overdue alerts merely because this feature starts.
+// Keep this baseline fixed: eligible cycles continue daily until a tariff change.
+const RENEWAL_TRACKING_FROM = "2026-10-01";
 export function bogotaDate(now = new Date()) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/Bogota",
@@ -97,7 +101,11 @@ export async function buildAlerts(rows, today, slot, recipient, from) {
       const reviewed = row.tariff_reviewed_at
         ? bogotaDate(new Date(row.tariff_reviewed_at))
         : null;
-      if (!reviewed || reviewed < start) {
+      if (
+        date >= RENEWAL_TRACKING_FROM &&
+        today >= start &&
+        (!reviewed || reviewed < start)
+      ) {
         dates.push({ type: "renovacion", date, days: [8, 3, 1] });
         // Preserve the original monthly notices, with one event at the start of each notice month.
         for (const months of [2, 1]) {
@@ -204,7 +212,7 @@ export async function buildAlerts(rows, today, slot, recipient, from) {
               responsable: escapeHtml(row.Responsable_cliente || "Sin asignar"),
               contacto: escapeHtml(row.Telefono || "Sin teléfono"),
               detalles_alerta: escapeHtml(
-                `${label}. Fecha programada: ${event.date}. ${event.note || ""}`,
+                `${label}. Fecha programada: ${event.date}. ${event.label || `${days} días ${event.business ? "de lunes a viernes" : "calendario"}`}. ${event.note || ""}`,
               ),
             },
           },
