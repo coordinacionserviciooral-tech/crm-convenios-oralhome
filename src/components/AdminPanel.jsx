@@ -67,6 +67,12 @@ function UserName({ user, disabled, onSave }) {
   );
 }
 export default function AdminPanel({ view, profile }) {
+  const [creating, setCreating] = useState(false);
+  const [newUser, setNewUser] = useState({
+    full_name: "",
+    email: "",
+    role: "consulta",
+  });
   const [rows, setRows] = useState([]),
     [page, setPage] = useState(0),
     [count, setCount] = useState(0),
@@ -172,6 +178,37 @@ export default function AdminPanel({ view, profile }) {
       setBusy(null);
     }
   }
+  async function createUser(event) {
+    event.preventDefault();
+    if (lock.current) return;
+    lock.current = true;
+    setBusy("new-user");
+    setNotice("");
+    try {
+      const { data, error } = await supabase.functions.invoke("admin-users", {
+        body: newUser,
+      });
+      if (error) {
+        let detail;
+        try {
+          detail = await error.context?.json();
+        } catch {
+          /* Keep the connection error. */
+        }
+        throw new Error(detail?.error || errorMessage(error));
+      }
+      if (data.error) throw new Error(data.error);
+      setNotice(data.message);
+      setCreating(false);
+      setNewUser({ full_name: "", email: "", role: "consulta" });
+      await load();
+    } catch (error) {
+      setNotice(errorMessage(error));
+    } finally {
+      lock.current = false;
+      setBusy(null);
+    }
+  }
   return (
     <main className="card admin">
       <div className="inline">
@@ -193,11 +230,90 @@ export default function AdminPanel({ view, profile }) {
         </p>
       )}
       {view === "usuarios" && (
-        <p className="muted">
-          Crea las cuentas en Supabase Authentication. Aquí puedes activar el
-          acceso y asignar permisos. Consulta lee y exporta; Comercial crea y
-          edita; Administrador gestiona usuarios y archivados.
-        </p>
+        <>
+          <p className="muted">
+            Crea usuarios y asigna sus permisos. Consulta lee y exporta;
+            Comercial crea y edita; Administrador gestiona usuarios y
+            archivados. El nuevo usuario recibe una invitación para establecer
+            su contraseña.
+          </p>
+          {!creating ? (
+            <button
+              className="btn primary"
+              disabled={!!busy}
+              onClick={() => setCreating(true)}
+            >
+              + Nuevo usuario
+            </button>
+          ) : (
+            <form className="card" onSubmit={createUser}>
+              <h3>Nuevo usuario</h3>
+              <label className="field">
+                Nombre completo
+                <input
+                  required
+                  maxLength={150}
+                  value={newUser.full_name}
+                  disabled={!!busy}
+                  onChange={(e) =>
+                    setNewUser({ ...newUser, full_name: e.target.value })
+                  }
+                />
+              </label>
+              <label className="field">
+                Correo del nuevo usuario
+                <input
+                  type="email"
+                  required
+                  maxLength={254}
+                  autoComplete="off"
+                  value={newUser.email}
+                  disabled={!!busy}
+                  onChange={(e) =>
+                    setNewUser({ ...newUser, email: e.target.value })
+                  }
+                />
+              </label>
+              <label className="field">
+                Rol del nuevo usuario
+                <select
+                  value={newUser.role}
+                  disabled={!!busy}
+                  onChange={(e) =>
+                    setNewUser({ ...newUser, role: e.target.value })
+                  }
+                >
+                  {Object.entries(ROLES).map(([key, label]) => (
+                    <option key={key} value={key}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="inline">
+                <button
+                  className="btn primary"
+                  disabled={!!busy || !newUser.full_name.trim()}
+                >
+                  {busy === "new-user"
+                    ? "Creando…"
+                    : "Crear usuario y enviar invitación"}
+                </button>
+                <button
+                  type="button"
+                  className="btn ghost"
+                  disabled={!!busy}
+                  onClick={() => {
+                    setCreating(false);
+                    setNewUser({ full_name: "", email: "", role: "consulta" });
+                  }}
+                >
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          )}
+        </>
       )}
       {view === "alertas" && (
         <p className="muted">

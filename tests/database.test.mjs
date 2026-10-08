@@ -206,10 +206,10 @@ test("documents remain private; consultation cannot upload and archived attachme
   await db.exec(documentSchema);
   const id = "00000000-0000-4000-8000-000000000010",
     path = `1/${id}/contrato.pdf`;
-  await asUser(db, "commercial");
+  await asUser(db, "admin");
   await db.query(
     `insert into storage.objects(bucket_id,name,owner_id,metadata) values('crm-convenios-documentos',$1,$2,'{"size":100}')`,
-    [path, ids.commercial],
+    [path, ids.admin],
   );
   await db.query(
     `insert into agreement_documents(id,agreement_id,original_name,storage_path,media_type,size_bytes) values($1,1,'contrato.pdf',$2,'application/pdf',100)`,
@@ -224,7 +224,7 @@ test("documents remain private; consultation cannot upload and archived attachme
   assert.equal(
     (await db.query("select count(*)::integer n from storage.objects")).rows[0]
       .n,
-    1,
+    0,
   );
   await assert.rejects(
     db.query(
@@ -310,7 +310,10 @@ test("document links reject ownership theft, mismatched sizes and archived agree
   );
   await asUser(db, "commercial");
   const insert = `insert into agreement_documents(id,agreement_id,original_name,storage_path,media_type,size_bytes) values($1,1,'contrato.pdf',$2,'application/pdf',$3)`;
-  await assert.rejects(db.query(insert, [id, path, 100]), /pertenece/);
+  await assert.rejects(
+    db.query(insert, [id, path, 100]),
+    /No autorizado|row-level security/,
+  );
   await asUser(db, "admin");
   await assert.rejects(db.query(insert, [id, path, 101]), /pertenece/);
   assert.equal(
@@ -363,6 +366,74 @@ test("tariff acknowledgement is server controlled and only additions or value ch
       (await db.query(`select tariff_reviewed_at from public."Aliados"`))
         .rows[0].tariff_reviewed_at,
       acknowledged,
+    );
+  } finally {
+    await db.close();
+  }
+});
+
+test("invited user activation is service-only, validates the active administrator and records the actor atomically", async () => {
+  const db = await setup();
+  try {
+    const migration = await readFile(
+      new URL("../supabase/admin-users.sql", import.meta.url),
+      "utf8",
+    );
+    await db.exec(migration);
+    await db.exec(migration);
+    await db.exec(`set role authenticated;`);
+    await assert.rejects(
+      db.query("select activate_crm_invited_user($1,$2,$3,$4)", [
+        ids.blocked,
+        ids.admin,
+        "Test Invite",
+        "comercial",
+      ]),
+      /permission denied/,
+    );
+    await db.exec(`reset role;`);
+    await assert.rejects(
+      db.query("select activate_crm_invited_user($1,$2,$3,$4)", [
+        ids.blocked,
+        ids.consult,
+        "Test Invite",
+        "comercial",
+      ]),
+      /Administrador no autorizado/,
+    );
+    await db.query("select activate_crm_invited_user($1,$2,$3,$4)", [
+      ids.blocked,
+      ids.admin,
+      "Test Invite",
+      "comercial",
+    ]);
+    const profile = (
+      await db.query(
+        "select full_name,role,is_active from profiles where id=$1",
+        [ids.blocked],
+      )
+    ).rows[0];
+    assert.deepEqual(profile, {
+      full_name: "Test Invite",
+      role: "comercial",
+      is_active: true,
+    });
+    assert.equal(
+      (
+        await db.query(
+          "select user_id from audit_logs where action='CREATE_USER'",
+        )
+      ).rows[0].user_id,
+      ids.admin,
+    );
+    await assert.rejects(
+      db.query("select activate_crm_invited_user($1,$2,$3,$4)", [
+        ids.blocked,
+        ids.admin,
+        "Override",
+        "administrador",
+      ]),
+      /ya est/,
     );
   } finally {
     await db.close();

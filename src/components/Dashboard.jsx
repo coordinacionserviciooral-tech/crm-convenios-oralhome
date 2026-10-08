@@ -253,7 +253,7 @@ export default function Dashboard({ profile, signOut }) {
     setExporting(true);
     try {
       const documents = [];
-      for (let offset = 0; ; offset += 500) {
+      for (let offset = 0; isAdmin; offset += 500) {
         const { data, error } = await supabase
           .from("agreement_documents")
           .select("*")
