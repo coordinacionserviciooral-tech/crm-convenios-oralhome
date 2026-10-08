@@ -12,6 +12,60 @@ const TITLES = {
   auditoria: "Historial de auditoría",
   alertas: "Historial de alertas",
 };
+function UserName({ user, disabled, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(user.full_name || "");
+  if (!editing)
+    return (
+      <div className="inline">
+        <span>{user.full_name || "Sin nombre"}</span>
+        <button
+          type="button"
+          className="btn ghost"
+          disabled={disabled}
+          aria-label={`Editar nombre de ${user.email}`}
+          onClick={() => {
+            setName(user.full_name || "");
+            setEditing(true);
+          }}
+        >
+          Editar nombre
+        </button>
+      </div>
+    );
+  return (
+    <form
+      className="inline"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        const trimmed = name.trim();
+        if (!trimmed || trimmed.length > 150 || disabled) return;
+        if (await onSave(user, { full_name: trimmed })) setEditing(false);
+      }}
+    >
+      <input
+        aria-label={`Nombre de ${user.email}`}
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+        maxLength={150}
+        required
+        disabled={disabled}
+        autoFocus
+      />
+      <button className="btn primary" disabled={disabled || !name.trim()}>
+        Guardar nombre
+      </button>
+      <button
+        type="button"
+        className="btn ghost"
+        disabled={disabled}
+        onClick={() => setEditing(false)}
+      >
+        Cancelar
+      </button>
+    </form>
+  );
+}
 export default function AdminPanel({ view, profile }) {
   const [rows, setRows] = useState([]),
     [page, setPage] = useState(0),
@@ -83,8 +137,10 @@ export default function AdminPanel({ view, profile }) {
         );
       setNotice("Usuario actualizado.");
       await load();
+      return true;
     } catch (error) {
       setNotice(errorMessage(error));
+      return false;
     } finally {
       lock.current = false;
       setBusy(null);
@@ -193,7 +249,9 @@ export default function AdminPanel({ view, profile }) {
                 <tr key={row.id}>
                   {view === "usuarios" ? (
                     <>
-                      <td>{row.full_name || "Sin nombre"}</td>
+                      <td>
+                        <UserName user={row} disabled={!!busy} onSave={change} />
+                      </td>
                       <td>{row.email}</td>
                       <td>
                         <select
