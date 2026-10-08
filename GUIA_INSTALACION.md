@@ -6,7 +6,7 @@
 
 
 
-Entra con tu correo y contraseña. Consulta puede leer y exportar. Comercial puede crear y editar convenios y seguimientos. Administrador puede gestionar perfiles, archivar, restaurar, revisar auditoría y obtener respaldos completos. Crea usuarios desde Supabase Authentication; aparecen desactivados con rol Consulta hasta que un administrador los habilita.
+Entra con tu correo y contraseña. Consulta puede leer convenios; Comercial puede editar convenios y seguimientos existentes. Solo Administrador crea convenios, exporta CSV/PDF/Excel, obtiene respaldo JSON y accede a Usuarios, Auditoría, Alertas y documentación. El administrador crea usuarios desde Usuarios y comparte el enlace privado de activación con el destinatario.
 
 
 
