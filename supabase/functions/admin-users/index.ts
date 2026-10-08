@@ -9,6 +9,7 @@ Deno.serve(async (request) => {
   const origin = request.headers.get("origin") || "";
   const headers = {
     "Content-Type": "application/json",
+    "Cache-Control": "no-store",
     "Access-Control-Allow-Origin": origins.has(origin)
       ? origin
       : "https://crm-convenios-oralhome.vercel.app",
@@ -53,11 +54,15 @@ Deno.serve(async (request) => {
           : null;
       },
       async invite(email: string, name: string) {
-        const { data, error } = await sb.auth.admin.inviteUserByEmail(email, {
-          data: { full_name: name },
-          redirectTo: "https://crm-convenios-oralhome.vercel.app/?recovery=1",
+        const { data, error } = await sb.auth.admin.generateLink({
+          type: "invite",
+          email,
+          options: {
+            data: { full_name: name },
+            redirectTo: "https://crm-convenios-oralhome.vercel.app/?recovery=1",
+          },
         });
-        return { id: data.user?.id, error };
+        return { id: data.user?.id, link: data.properties?.action_link, error };
       },
       async activate(id: string, actor: string, name: string, role: string) {
         const { error } = await sb.rpc("activate_crm_invited_user", {
