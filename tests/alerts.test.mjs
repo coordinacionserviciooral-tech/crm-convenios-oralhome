@@ -154,6 +154,55 @@ test("failed delivery remains retryable; successful retry records actual confirm
   assert.equal(sendCalls, 2);
 });
 
+test("renewal excludes historical cycles while current and upcoming cycles repeat until tariff change", async () => {
+  const months = [
+    "Enero",
+    "Febrero",
+    "Marzo",
+    "Abril",
+    "Mayo",
+    "Junio",
+    "Julio",
+    "Agosto",
+    "Septiembre",
+    "Octubre",
+    "Noviembre",
+    "Diciembre",
+  ];
+  const october = await buildAlerts(
+    months.map((month, index) => ({
+      ...row,
+      Id: index + 1,
+      Mes_renovacion: month,
+    })),
+    "2026-10-08",
+    "am",
+    "a@b.com",
+    "",
+  );
+  assert.deepEqual(
+    october.map((a) => a.date),
+    ["2026-10-01", "2026-11-01", "2026-12-01"],
+  );
+  // January only enters on November 1, never as an overdue January 2026 notice.
+  const january = await buildAlerts([row], "2026-11-01", "pm", "a@b.com", "");
+  assert.equal(january[0].date, "2027-01-01");
+  assert.equal(january[0].type, "renovacion_mensual");
+  // A valid October cycle remains pending even after its renewal month passes.
+  assert.equal(
+    (
+      await buildAlerts(
+        [{ ...row, Mes_renovacion: "Octubre" }],
+        "2026-12-10",
+        "am",
+        "a@b.com",
+        "",
+      )
+    )[0].date,
+    "2026-10-01",
+  );
+});
+
 test("renewal repeats daily through overdue dates until a tariff change, then resumes next annual cycle", async () => {
   const source = { ...row, Mes_renovacion: "Noviembre" };
   for (const today of [

@@ -139,6 +139,13 @@ Deno.serve(async (request) => {
         recipient,
         slot,
         provider,
+        preview: details.map((alert) => ({
+          company: alert.payload.template_params.compañia,
+          product: alert.payload.template_params.producto,
+          type: alert.type,
+          date: alert.date,
+          notice: alert.payload.notice_label,
+        })),
       });
     // Prevent authenticated manual invocations from sending outside the exact scheduled minute.
     const localTime = new Intl.DateTimeFormat("en-GB", {
