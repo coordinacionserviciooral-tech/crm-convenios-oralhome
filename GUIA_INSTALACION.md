@@ -68,4 +68,16 @@ En SharePoint agrega un vínculo a la URL HTTPS del CRM. La autenticación del C
 ## Mantenimiento
 
 Descarga respaldos periódicos desde la cuenta del administrador y conserva los archivos en un lugar privado. Los ZIP, documentos con credenciales y CSV de origen nunca se suben al repositorio público. Revisa Alertas para identificar fallos, agotamiento de intentos o envíos sin confirmación.
+# Documentos, indicadores y exportaciones (versión 1.2)
 
+Después de `supabase/schema.sql`, ejecuta `supabase/documents.sql`. Crea un bucket privado de 25 MB por archivo y la tabla de vínculos con auditoría. La migración es repetible y no cambia convenios existentes ni los demás buckets.
+
+El logo vuelve al inicio y limpia los filtros. Los cuatro indicadores abren convenios activos, organizaciones agrupadas y sus convenios, seguimientos pendientes individuales o vencidos. Los pendientes incluyen registros sin fecha; éstos no se consideran vencidos. La búsqueda y los filtros aplican también a cada vista.
+
+Las exportaciones usan la selección visible. CSV exporta convenios, organizaciones o seguimientos según la vista; Excel incluye hojas de Convenios, Tarifas y Seguimientos, con importes numéricos; PDF genera fichas completas de los convenios o una tabla de seguimientos. Las librerías se cargan sólo cuando se solicita la exportación.
+
+En los detalles de cualquier convenio existente o recién guardado aparece Documentos del convenio. Administrador y Comercial pueden cargar uno o varios archivos, elegir categoría y añadir descripción. Consulta puede descargar documentos activos. Sólo el administrador puede archivar/restaurar adjuntos; archivar conserva el archivo y se registra en la auditoría. No hay eliminación permanente de documentos vinculados ni enlaces públicos. Si una carga no puede vincularse, se intenta limpiar sólo ese archivo recién cargado y sin vínculo.
+
+En Usuarios, el administrador dispone de Restablecer contraseña para cuentas activas. Envía un enlace de Supabase al correo registrado; el destinatario elige su nueva contraseña en el CRM. No asigna contraseñas temporales ni revela claves al administrador. Aplica el límite de correos del proveedor de autenticación. La redirección de producción debe incluir `https://crm-convenios-oralhome.vercel.app/?recovery=1`.
+
+El Respaldo de datos JSON contiene convenios y referencias, categorías y descripciones de documentos. No incorpora el contenido binario de los archivos; éstos se descargan desde cada convenio. La vista de Organizaciones exporta su listado agrupado en PDF y añade la hoja Organizaciones al Excel.

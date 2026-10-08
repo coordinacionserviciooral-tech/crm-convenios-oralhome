@@ -90,6 +90,32 @@ export default function AdminPanel({ view, profile }) {
       setBusy(null);
     }
   }
+  async function resetPassword(user) {
+    if (lock.current || !user.is_active) return;
+    if (
+      !confirm(
+        `¿Enviar a ${user.email} un enlace para que establezca una nueva contraseña?`,
+      )
+    )
+      return;
+    lock.current = true;
+    setBusy(user.id);
+    setNotice("");
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+        redirectTo: `${location.origin}/?recovery=1`,
+      });
+      if (error) throw error;
+      setNotice(
+        `Solicitud enviada a ${user.email}. El usuario debe abrir el correo y elegir su nueva contraseña.`,
+      );
+    } catch (error) {
+      setNotice(errorMessage(error));
+    } finally {
+      lock.current = false;
+      setBusy(null);
+    }
+  }
   return (
     <main className="card admin">
       <div className="inline">
@@ -135,7 +161,7 @@ export default function AdminPanel({ view, profile }) {
             <thead>
               <tr>
                 {(view === "usuarios"
-                  ? ["Nombre", "Correo", "Rol", "Acceso"]
+                  ? ["Nombre", "Correo", "Rol", "Acceso", "Contraseña"]
                   : view === "auditoria"
                     ? [
                         "Fecha",
@@ -198,6 +224,15 @@ export default function AdminPanel({ view, profile }) {
                           {row.is_active ? "Bloquear" : "Activar"}
                         </button>
                         {row.id === profile.id && <small> Tu cuenta</small>}
+                      </td>
+                      <td>
+                        <button
+                          className="btn ghost"
+                          disabled={!!busy || !row.is_active}
+                          onClick={() => resetPassword(row)}
+                        >
+                          Restablecer contraseña
+                        </button>
                       </td>
                     </>
                   ) : view === "auditoria" ? (

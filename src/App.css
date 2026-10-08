@@ -449,3 +449,54 @@ h1 {
     grid-template-columns: 1fr;
   }
 }
+.logo-home {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+button.kpi {
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  border: 2px solid transparent;
+}
+button.kpi:hover,
+button.kpi[aria-pressed="true"] {
+  border-color: #0077b6;
+}
+.documents {
+  border-top: 1px solid #dbe7ed;
+  padding-top: 12px;
+  margin-top: 18px;
+}
+.document-list {
+  padding: 0;
+  list-style: none;
+}
+.document-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #dbe7ed;
+  overflow-wrap: anywhere;
+}
+.document-list p {
+  margin: 4px 0;
+}
+.document-form {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+.document-form textarea {
+  min-height: 70px;
+}
+@media (max-width: 650px) {
+  .document-list li {
+    flex-direction: column;
+  }
+}
