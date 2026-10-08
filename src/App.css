@@ -279,6 +279,18 @@ h1 {
   flex: 1;
   min-width: 220px;
 }
+.search-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.search-controls .search {
+  flex: 1;
+  min-width: 0;
+}
+.search-controls button {
+  flex-shrink: 0;
+}
 .actions {
   align-items: center;
 }
