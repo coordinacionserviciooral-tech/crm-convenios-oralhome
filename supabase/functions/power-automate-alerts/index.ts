@@ -1,11 +1,11 @@
 import { createClient } from "npm:@supabase/supabase-js@2.105.1";
-import { bogotaDate, buildAlerts } from "./alerts.js";
+import { bogotaDate, buildAlerts, buildDigest } from "./alerts.js";
 import { deliverAlert } from "./delivery.js";
 import { sendMessage } from "./provider.js";
 
 type Alert = {
   key: string;
-  agreement_id: number;
+  agreement_id: number | null;
   type: string;
   date: string;
   days: number;
@@ -48,7 +48,7 @@ Deno.serve(async (request) => {
   const suppliedSecret = request.headers.get("x-cron-secret");
   if (!suppliedSecret) return json({ error: "No autorizado" }, 401);
   const slot = request.headers.get("x-run-slot") || "am";
-  if (!["am", "pm", "retry"].includes(slot))
+  if (!["am", "pm"].includes(slot))
     return json({ error: "Horario inválido" }, 400);
   try {
     const options = await request.json().catch(() => ({}));
@@ -80,9 +80,7 @@ Deno.serve(async (request) => {
             privateKey: Deno.env.get("EMAILJS_PRIVATE_KEY"),
           };
     const from = provider === "resend" ? secret("ALERT_FROM_EMAIL") : "",
-      recipient =
-        Deno.env.get("ALERT_TO_EMAIL") ||
-        "coordinadordeservicio@oralhome.com.co";
+      recipient = "coordinadordeservicio@oralhome.com.co";
     const rows: Record<string, unknown>[] = [];
     for (let offset = 0; ; offset += 500) {
       const { data, error } = await sb
@@ -95,76 +93,68 @@ Deno.serve(async (request) => {
       rows.push(...data);
       if (data.length < 500) break;
     }
-    const alerts: Alert[] =
-      slot === "retry"
-        ? []
-        : await buildAlerts(rows, bogotaDate(), slot, recipient, from);
-    // Retry only within 23 hours: Resend retains idempotency keys for 24 h.
-    const cutoff = new Date(Date.now() - 23 * 3600000).toISOString();
-    const { data: queued, error: queuedError } = await sb
+    const today = bogotaDate();
+    const details = await buildAlerts(rows, today, slot, recipient, from);
+    // Failed summaries are reconsidered only at the next authorized schedule.
+    const { data: failed, error: failedError } = await sb
       .from("alert_log")
-      .select("*")
-      .in("status", ["pending", "failed", "processing"])
-      .lt("attempts", 12)
-      .order("id")
+      .select("id,alert_key,payload,status")
+      .in("status", ["failed", "pending"])
+      .order("id", { ascending: false })
       .limit(200);
-    if (queuedError) throw queuedError;
+    if (failedError) throw failedError;
+    for (const entry of failed || []) {
+      for (const old of entry.payload?.items || []) {
+        const current = rows.find((row) => row.Id === old.agreement_id);
+        if (!current) continue;
+        const refreshed = await buildAlerts(
+          [current],
+          old.payload.due_date,
+          old.slot,
+          recipient,
+          from,
+        );
+        const relevant = refreshed.find((item) => item.key === old.key);
+        if (
+          relevant &&
+          !details.some(
+            (item) =>
+              item.agreement_id === relevant.agreement_id &&
+              item.type === relevant.type &&
+              item.date === relevant.date &&
+              item.days === relevant.days,
+          )
+        )
+          details.push(relevant);
+      }
+    }
+    const digest = buildDigest(details, today, slot, recipient, from);
     if (options.dry_run === true)
       return json({
         ok: true,
         dry_run: true,
         agreements: rows.length,
-        scheduled: alerts.length,
-        queued: queued?.length || 0,
+        scheduled: details.length,
+        emails: digest ? 1 : 0,
+        recipient,
         slot,
         provider,
       });
-    for (const alert of alerts) alert.payload.provider = provider;
-    const activeIds = new Set(rows.map((row) => row.Id));
-    for (const entry of queued || []) {
-      if (!entry.payload || alerts.some((a) => a.key === entry.alert_key))
-        continue;
-      const expired =
-        !entry.payload.queued_at || entry.payload.queued_at < cutoff;
-      const current = rows.find((row) => row.Id === entry.agreement_id);
-      const stillRelevant =
-        current &&
-        entry.payload.due_date &&
-        (
-          await buildAlerts(
-            [current],
-            entry.payload.due_date,
-            entry.run_slot,
-            entry.recipient,
-            entry.payload.from || "",
-          )
-        ).some((alert) => alert.key === entry.alert_key);
-      if (!activeIds.has(entry.agreement_id) || expired || !stillRelevant) {
-        const { error } = await sb
-          .from("alert_log")
-          .update({
-            status: expired ? "expired" : "cancelled",
-            last_error: expired
-              ? "Reintento requiere revisión manual después de 23 horas"
-              : "Convenio archivado o seguimiento completado/cambiado",
-            updated_at: new Date().toISOString(),
-          })
-          .eq("id", entry.id)
-          .eq("attempts", entry.attempts);
-        if (error) throw error;
-        continue;
-      }
-      alerts.push({
-        key: entry.alert_key,
-        agreement_id: entry.agreement_id,
-        type: entry.alert_type,
-        date: entry.scheduled_for,
-        days: entry.days_before,
-        slot: entry.run_slot,
-        recipient: entry.recipient,
-        payload: entry.payload,
+    // Prevent authenticated manual invocations from sending outside the exact scheduled minute.
+    const localTime = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "America/Bogota",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    }).format(new Date());
+    if (localTime !== (slot === "am" ? "08:00" : "15:00"))
+      return json({
+        ok: true,
+        skipped: true,
+        reason: "Fuera del horario de envío",
       });
-    }
+    const alerts: Alert[] = digest ? [digest] : [];
+    for (const alert of alerts) alert.payload.provider = provider;
     const adapter = {
       async claim(alert: Alert) {
         const { data, error } = await sb.rpc("claim_crm_alert", {
@@ -217,6 +207,21 @@ Deno.serve(async (request) => {
     for (const alert of alerts.slice(0, 40)) {
       const result = await deliverAlert(alert, adapter);
       counts[result as keyof typeof counts]++;
+    }
+    if (counts.sent || !alerts.length) {
+      const superseded = (failed || [])
+        .filter(
+          (entry) => entry.payload?.items && entry.alert_key !== digest?.key,
+        )
+        .map((entry) => entry.id);
+      if (superseded.length) {
+        const { error } = await sb
+          .from("alert_log")
+          .update({ status: "cancelled", updated_at: new Date().toISOString() })
+          .in("id", superseded)
+          .in("status", ["failed", "pending"]);
+        if (error) throw error;
+      }
     }
     return json({
       ok: counts.failed === 0 && counts.uncertain === 0,

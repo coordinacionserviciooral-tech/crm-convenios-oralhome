@@ -80,39 +80,75 @@ export async function buildAlerts(rows, today, slot, recipient, from) {
     if (month >= 0) {
       let year = Number(today.slice(0, 4));
       let date = `${year}-${String(month + 1).padStart(2, "0")}-01`;
-      if (date < today)
-        date = `${++year}-${String(month + 1).padStart(2, "0")}-01`;
-      dates.push({ type: "renovacion", date, days: [8, 3, 1] });
-      // Preserve the original monthly notices, with one event at the start of each notice month.
-      for (const months of [2, 1]) {
-        const due = new Date(Date.UTC(year, month - months, 1, 12))
+      const nextStart = new Date(Date.UTC(year + 1, month - 2, 1, 12))
+        .toISOString()
+        .slice(0, 10);
+      if (today >= nextStart) year++;
+      let start = new Date(Date.UTC(year, month - 2, 1, 12))
+        .toISOString()
+        .slice(0, 10);
+      if (today < start) {
+        year--;
+        start = new Date(Date.UTC(year, month - 2, 1, 12))
           .toISOString()
           .slice(0, 10);
-        if (due === today)
+      }
+      date = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+      const reviewed = row.tariff_reviewed_at
+        ? bogotaDate(new Date(row.tariff_reviewed_at))
+        : null;
+      if (!reviewed || reviewed < start) {
+        dates.push({ type: "renovacion", date, days: [8, 3, 1] });
+        // Preserve the original monthly notices, with one event at the start of each notice month.
+        for (const months of [2, 1]) {
+          const due = new Date(Date.UTC(year, month - months, 1, 12))
+            .toISOString()
+            .slice(0, 10);
+          if (due === today)
+            dates.push({
+              type: "renovacion_mensual",
+              date,
+              days: [
+                Math.round(
+                  (new Date(`${date}T12:00:00Z`).getTime() -
+                    new Date(`${due}T12:00:00Z`).getTime()) /
+                    DAY,
+                ),
+              ],
+              explicitDue: due,
+              label: `${months} mes(es)`,
+            });
+        }
+        if (
+          ![8, 3, 1].some((days) => subtractDays(date, days) === today) &&
+          ![2, 1].some(
+            (months) =>
+              new Date(Date.UTC(year, month - months, 1, 12))
+                .toISOString()
+                .slice(0, 10) === today,
+          )
+        ) {
           dates.push({
-            type: "renovacion_mensual",
+            type: "renovacion_diaria",
             date,
-            days: [
-              Math.round(
-                (new Date(`${date}T12:00:00Z`).getTime() -
-                  new Date(`${due}T12:00:00Z`).getTime()) /
-                  DAY,
-              ),
-            ],
-            explicitDue: due,
-            label: `${months} mes(es)`,
+            days: [0],
+            explicitDue: today,
+            label: "Renovación pendiente: actualizar tarifa",
           });
+        }
       }
     }
     for (const activity of Array.isArray(row.actividades)
       ? row.actividades
       : []) {
       if (activity.cumplida || !isDate(activity.fecha)) continue;
+      if (today < subtractWeekdays(activity.fecha, 8)) continue;
       dates.push({
         type: "actividad",
         date: activity.fecha,
         days: [8],
         business: true,
+        explicitDue: today,
         note: activity.nota,
         identity:
           activity.id ||
@@ -127,13 +163,14 @@ export async function buildAlerts(rows, today, slot, recipient, from) {
             ? subtractWeekdays(event.date, days)
             : subtractDays(event.date, days));
         if (due !== today) continue;
-        const key = `${row.Id}:${event.type}:${event.identity ? `${event.identity}:` : ""}${event.date}:${days}:${slot}`;
+        const key = `${row.Id}:${event.type}:${event.identity ? `${event.identity}:` : ""}${event.date}:${days}:${slot}${["renovacion_diaria", "actividad"].includes(event.type) ? `:${today}` : ""}`;
         if (known.has(key)) continue;
         known.add(key);
         const label = {
           gestion: "Gestión comercial",
           renovacion: "Renovación",
           renovacion_mensual: "Renovación",
+          renovacion_diaria: "Renovación pendiente",
           actividad: "Seguimiento pendiente",
         }[event.type];
         const subject = `CRM Oralhome · ${row.Compañia} · ${label}`;
@@ -175,4 +212,43 @@ export async function buildAlerts(rows, today, slot, recipient, from) {
       }
   }
   return alerts;
+}
+export function buildDigest(alerts, today, slot, recipient, from) {
+  if (!alerts.length) return null;
+  const subject = `CRM Oralhome · Alertas ${today} · ${slot === "am" ? "08:00" : "15:00"}`;
+  const details = alerts
+    .map(
+      (alert) =>
+        alert.payload.template_params.detalles_alerta +
+        ` · ${alert.payload.template_params.compañia} · ${alert.payload.template_params.producto}`,
+    )
+    .join("\n\n");
+  return {
+    key: `resumen:${today}:${slot}`,
+    agreement_id: null,
+    type: "resumen",
+    date: today,
+    days: 0,
+    slot,
+    recipient,
+    payload: {
+      from,
+      to: [recipient],
+      subject,
+      html: `<h1>${escapeHtml(subject)}</h1>${alerts.map((alert) => alert.payload.html).join("<hr>")}`,
+      queued_at: new Date().toISOString(),
+      due_date: today,
+      items: alerts,
+      template_params: {
+        to_email: recipient,
+        compañia: "Resumen de convenios",
+        producto: `${alerts.length} alerta(s) pendiente(s)`,
+        mes_vence: today,
+        tiempo_alerta: slot === "am" ? "08:00 Colombia" : "15:00 Colombia",
+        responsable: "Coordinación de servicio",
+        contacto: recipient,
+        detalles_alerta: details,
+      },
+    },
+  };
 }

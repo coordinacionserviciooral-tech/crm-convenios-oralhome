@@ -22,11 +22,4 @@ select cron.schedule('oralhome-alertas-pm','0 20 * * *', $job$
    headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',(select decrypted_secret from vault.decrypted_secrets where name='oralhome_cron_secret' limit 1),'x-run-slot','pm'),
    body := '{}'::jsonb, timeout_milliseconds := 30000);
 $job$);
--- Retry failed messages promptly while the provider idempotency key remains valid (24 h).
-select cron.schedule('oralhome-alertas-retry','15 * * * *', $job$
- select net.http_post(
-   url := (select decrypted_secret from vault.decrypted_secrets where name='oralhome_project_url' limit 1) || '/functions/v1/power-automate-alerts',
-   headers := jsonb_build_object('Content-Type','application/json','x-cron-secret',(select decrypted_secret from vault.decrypted_secrets where name='oralhome_cron_secret' limit 1),'x-run-slot','retry'),
-   body := '{}'::jsonb, timeout_milliseconds := 30000);
-$job$);
-
+-- Failed notices are included at the next 08:00/15:00 run; no hourly email retry.
