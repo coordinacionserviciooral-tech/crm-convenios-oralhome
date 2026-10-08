@@ -234,9 +234,10 @@ export default function AdminPanel({ view, profile }) {
       {view === "usuarios" && (
         <>
           <p className="muted">
-            Crea usuarios y asigna sus permisos. Consulta lee y exporta;
-            Comercial crea y edita; Administrador gestiona usuarios y
-            archivados. Al crear la cuenta, copia su enlace de activación y
+            Crea usuarios y asigna sus permisos. Consulta lee; Comercial edita
+            convenios existentes. Solo Administrador crea convenios, exporta,
+            obtiene respaldos y accede a usuarios, auditoría, alertas y
+            documentación. Al crear la cuenta, copia su enlace de activación y
             compártelo con el destinatario para que establezca su contraseña.
           </p>
           {invitation && (
