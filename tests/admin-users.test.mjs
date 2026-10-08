@@ -39,11 +39,12 @@ test("admin invitation assigns each authorized role without passwords or changin
       authorize: async () => "actor",
       invite: async (...args) => {
         calls.push(args);
-        return { id: "new" };
+        return { id: "new", link: "https://example.com/invite" };
       },
       activate: async (...args) => calls.push(args),
     });
     assert.equal(result.status, 201);
+    assert.equal(result.invitation_url, "https://example.com/invite");
     assert.deepEqual(calls, [
       ["ana@example.com", "Ana P�rez"],
       ["new", "actor", "Ana P�rez", role],
@@ -61,7 +62,7 @@ test("admin invitation assigns each authorized role without passwords or changin
   assert.equal(activated, false);
   const partial = await createInvitedUser(input, "admin", {
     authorize: async () => "actor",
-    invite: async () => ({ id: "new" }),
+    invite: async () => ({ id: "new", link: "https://example.com/invite" }),
     activate: async () => {
       throw Error("database failure");
     },

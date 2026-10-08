@@ -25,7 +25,7 @@ export async function createInvitedUser(input, token, adapter) {
       error: "Revisa el nombre, correo y rol del nuevo usuario.",
     };
   const invitation = await adapter.invite(email, name);
-  if (invitation.error || !invitation.id)
+  if (invitation.error || !invitation.id || !invitation.link)
     return {
       status: 409,
       error:
@@ -43,7 +43,8 @@ export async function createInvitedUser(input, token, adapter) {
   return {
     status: 201,
     id: invitation.id,
+    invitation_url: invitation.link,
     message:
-      "Usuario creado y rol asignado. Se solicitó el correo de invitación para que establezca su contraseña.",
+      "Usuario creado y rol asignado. Comparte el enlace de activación con su destinatario para que establezca su contraseña.",
   };
 }

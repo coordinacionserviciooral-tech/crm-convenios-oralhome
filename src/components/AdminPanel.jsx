@@ -68,6 +68,7 @@ function UserName({ user, disabled, onSave }) {
 }
 export default function AdminPanel({ view, profile }) {
   const [creating, setCreating] = useState(false);
+  const [invitation, setInvitation] = useState("");
   const [newUser, setNewUser] = useState({
     full_name: "",
     email: "",
@@ -199,6 +200,7 @@ export default function AdminPanel({ view, profile }) {
       }
       if (data.error) throw new Error(data.error);
       setNotice(data.message);
+      setInvitation(data.invitation_url || "");
       setCreating(false);
       setNewUser({ full_name: "", email: "", role: "consulta" });
       await load();
@@ -234,9 +236,42 @@ export default function AdminPanel({ view, profile }) {
           <p className="muted">
             Crea usuarios y asigna sus permisos. Consulta lee y exporta;
             Comercial crea y edita; Administrador gestiona usuarios y
-            archivados. El nuevo usuario recibe una invitación para establecer
-            su contraseña.
+            archivados. Al crear la cuenta, copia su enlace de activación y
+            compártelo con el destinatario para que establezca su contraseña.
           </p>
+          {invitation && (
+            <section className="card">
+              <label className="field">
+                Enlace de activación del nuevo usuario
+                <input readOnly value={invitation} />
+              </label>
+              <div className="inline">
+                <button
+                  type="button"
+                  className="btn primary"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(invitation);
+                      setNotice(
+                        "Enlace copiado. Compártelo directamente con su destinatario.",
+                      );
+                    } catch {
+                      setNotice("Selecciona y copia el enlace de activación.");
+                    }
+                  }}
+                >
+                  Copiar enlace de activación
+                </button>
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={() => setInvitation("")}
+                >
+                  Cerrar enlace
+                </button>
+              </div>
+            </section>
+          )}
           {!creating ? (
             <button
               className="btn primary"
@@ -297,7 +332,7 @@ export default function AdminPanel({ view, profile }) {
                 >
                   {busy === "new-user"
                     ? "Creando…"
-                    : "Crear usuario y enviar invitación"}
+                    : "Crear usuario y obtener enlace"}
                 </button>
                 <button
                   type="button"
