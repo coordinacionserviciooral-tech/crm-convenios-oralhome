@@ -23,6 +23,7 @@ import Agreement from "./Agreement";
 import AgreementEditor from "./AgreementEditor";
 import AdminPanel from "./AdminPanel";
 import MetricIcon from "./MetricIcon";
+import ThemeToggle from "./ThemeToggle";
 import { PasswordForm } from "./Auth";
 
 export default function Dashboard({ profile, signOut }) {
@@ -329,6 +330,7 @@ export default function Dashboard({ profile, signOut }) {
               {label}
             </button>
           ))}
+          <ThemeToggle />
           <button className="btn dark" onClick={signOut}>
             Cerrar sesión
           </button>

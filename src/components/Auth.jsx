@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { errorMessage } from "../lib/crm";
+import ThemeToggle from "./ThemeToggle";
 
 export function AuthForm({ message }) {
   const [email, setEmail] = useState(""),
@@ -56,6 +57,9 @@ export function AuthForm({ message }) {
   }
   return (
     <main className="login">
+      <div className="auth-theme">
+        <ThemeToggle />
+      </div>
       <form className="card auth-card" onSubmit={submit}>
         <img
           className="logo"
@@ -197,5 +201,14 @@ export function PasswordForm({ recovery = false, onComplete, signOut }) {
       )}
     </form>
   );
-  return recovery ? <main className="login">{form}</main> : form;
+  return recovery ? (
+    <main className="login">
+      <div className="auth-theme">
+        <ThemeToggle />
+      </div>
+      {form}
+    </main>
+  ) : (
+    form
+  );
 }

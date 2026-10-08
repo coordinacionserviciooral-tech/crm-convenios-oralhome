@@ -941,3 +941,208 @@ button.kpi[aria-pressed="true"] {
     scroll-behavior: auto !important;
   }
 }
+
+.theme-toggle svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+}
+.auth-theme {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+}
+.login {
+  position: relative;
+}
+.auth-theme .btn {
+  background: #ffffff12;
+  color: #e5f4ff;
+  border-color: #ffffff30;
+}
+.auth-theme .btn:hover {
+  background: #ffffff22;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  color: #dce6f2;
+  background: #0d1726;
+  --navy: #84c6f0;
+  --line: #2b3c51;
+  --muted: #a4b5cb;
+  --shadow: 0 4px 22px #00000015;
+}
+[data-theme="dark"] h1,
+[data-theme="dark"] h2,
+[data-theme="dark"] h3,
+[data-theme="dark"] h4 {
+  color: #e3edf9;
+}
+[data-theme="dark"] .header,
+[data-theme="dark"] .card,
+[data-theme="dark"] .agreement,
+[data-theme="dark"] .toolbar[aria-label="Filtros"],
+[data-theme="dark"] button.kpi,
+[data-theme="dark"] .overview-label {
+  background: #172437;
+}
+[data-theme="dark"] .logo-home,
+[data-theme="dark"] .auth-card .logo {
+  background: #fff;
+  border-radius: 9px;
+  padding: 6px;
+}
+[data-theme="dark"] .eyebrow {
+  color: #63d4e3;
+}
+[data-theme="dark"] .overview-label,
+[data-theme="dark"] .kpi > span:not(.metric-icon) {
+  color: #aabdd3;
+}
+[data-theme="dark"] button.kpi[aria-pressed="true"] {
+  background: linear-gradient(110deg, #173444, #172437);
+  border-color: #3895ad;
+}
+[data-theme="dark"] button.kpi:hover,
+[data-theme="dark"] .agreement:hover {
+  border-color: #52768c;
+}
+[data-theme="dark"] .primary {
+  background: #1969a5;
+  color: #fff;
+}
+[data-theme="dark"] .primary:hover:not(:disabled) {
+  background: #207ebf;
+}
+[data-theme="dark"] .ghost {
+  background: #1c2b40;
+  color: #c0d8ed;
+  border-color: #3a4e65;
+}
+[data-theme="dark"] .ghost:hover:not(:disabled) {
+  background: #263c55;
+  border-color: #6687a3;
+}
+[data-theme="dark"] .dark {
+  background: #24374d;
+  color: #cbddee;
+}
+[data-theme="dark"] .dark:hover:not(:disabled) {
+  background: #304964;
+}
+[data-theme="dark"] .nav .ghost {
+  background: transparent;
+  color: #b0c3d8;
+}
+[data-theme="dark"] .nav .primary {
+  background: #193e58;
+  color: #9cdbfa;
+}
+[data-theme="dark"] .danger {
+  background: #3d282b;
+  border-color: #684047;
+  color: #ffb7aa;
+}
+[data-theme="dark"] .danger:hover:not(:disabled) {
+  background: #533138;
+}
+[data-theme="dark"] .metric-icon {
+  background: #1a3d56;
+  color: #80cfef;
+}
+[data-theme="dark"] .metric-organizaciones {
+  background: #163e43;
+  color: #72d7dd;
+}
+[data-theme="dark"] .metric-pendientes {
+  background: #403621;
+  color: #f0cb83;
+}
+[data-theme="dark"] .metric-vencidos {
+  background: #442c31;
+  color: #f7b3a5;
+}
+[data-theme="dark"] .field {
+  color: #b6c9df;
+}
+[data-theme="dark"] .field input,
+[data-theme="dark"] .field select,
+[data-theme="dark"] .field textarea,
+[data-theme="dark"] .search,
+[data-theme="dark"] .users select {
+  background: #101e30;
+  color: #dce8f5;
+  border-color: #3b5068;
+}
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder {
+  color: #92a6bf;
+}
+[data-theme="dark"] .field input:focus,
+[data-theme="dark"] .field select:focus,
+[data-theme="dark"] .field textarea:focus,
+[data-theme="dark"] .search:focus {
+  background: #14283b;
+  border-color: #62bad1;
+}
+[data-theme="dark"] .search-controls button,
+[data-theme="dark"] .next span {
+  color: #8fd5ed;
+}
+[data-theme="dark"] .badge {
+  background: #1c3a53;
+  color: #b2d8f4;
+}
+[data-theme="dark"] .badge.warning {
+  background: #403620;
+  color: #f3d297;
+}
+[data-theme="dark"] .badge.success {
+  background: #1c3d33;
+  color: #9ad9be;
+}
+[data-theme="dark"] .overdue {
+  color: #f8b2a3 !important;
+}
+[data-theme="dark"] .rate,
+[data-theme="dark"] .followup,
+[data-theme="dark"] .admin > .card {
+  background: #132033;
+  border-color: var(--line);
+}
+[data-theme="dark"] .modal {
+  background: #172437;
+  color: #dce6f2;
+}
+[data-theme="dark"] .users th {
+  background: #122033;
+  color: #b2c5dc;
+}
+[data-theme="dark"] .users tbody tr:hover {
+  background: #1c2e44;
+}
+[data-theme="dark"] .notice {
+  background: #3c331f;
+  border-color: #685634;
+  color: #f2d79d;
+}
+[data-theme="dark"] .error {
+  background: #41282e;
+  border-color: #6b3d46;
+  color: #ffc0b6;
+}
+[data-theme="dark"] .login {
+  background:
+    radial-gradient(ellipse at 15% 10%, #143753 0, transparent 50%),
+    radial-gradient(ellipse at 85% 85%, #07546244 0, transparent 55%), #081423;
+}
+@media (max-width: 750px) {
+  .login {
+    padding-top: 82px;
+  }
+  .auth-theme {
+    top: 18px;
+    right: 18px;
+  }
+}
