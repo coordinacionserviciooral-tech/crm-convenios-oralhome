@@ -109,7 +109,9 @@ export default function Agreement({
               </button>
             )}
           </div>
-          <AgreementDocuments row={row} canEdit={canEdit} isAdmin={isAdmin} />
+          {isAdmin && (
+            <AgreementDocuments row={row} canEdit={canEdit} isAdmin={isAdmin} />
+          )}
         </div>
       )}
     </article>

@@ -8,7 +8,10 @@ export default function App() {
   const [auth, setAuth] = useState({
     session: null,
     ready: false,
-    recovery: location.hash.includes("type=recovery"),
+    recovery:
+      location.hash.includes("type=recovery") ||
+      location.hash.includes("type=invite") ||
+      new URLSearchParams(location.search).get("recovery") === "1",
   });
   const [profile, setProfile] = useState(null);
   const [message, setMessage] = useState("");
