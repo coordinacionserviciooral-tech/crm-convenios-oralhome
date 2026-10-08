@@ -104,6 +104,14 @@ test("database blocks anonymous and inactive access and enforces consultation re
 test("commercial may edit but cannot archive, restore, manage users or spoof creator", async () => {
   const db = await setup();
   await asUser(db, "commercial");
+  await assert.rejects(
+    db.exec(
+      `insert into public."Aliados"("Compa\u00f1ia") values('Forbidden')`,
+    ),
+    /row-level security|No autorizado/,
+  );
+  assert.equal((await db.query("select * from audit_logs")).rows.length, 0);
+  assert.equal((await db.query("select * from alert_log")).rows.length, 0);
   const edited = await db.query(
     `update public."Aliados" set "Producto"='Allowed', created_by=$1 returning *`,
     [ids.consult],

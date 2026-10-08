@@ -128,6 +128,8 @@ export default function Dashboard({ profile, signOut }) {
   async function save(payload, original) {
     if (!canEdit)
       throw new Error("Tu rol permite consultar, pero no editar convenios.");
+    if (!original.Id && !isAdmin)
+      throw new Error("Solo el administrador puede crear convenios.");
     let request = original.Id
       ? supabase
           .from("Aliados")
@@ -193,6 +195,7 @@ export default function Dashboard({ profile, signOut }) {
     }
   }
   function exportCsv() {
+    if (!isAdmin) return;
     const csv =
       metric === "organizaciones"
         ? [
@@ -216,7 +219,7 @@ export default function Dashboard({ profile, signOut }) {
     );
   }
   async function exportReport(format) {
-    if (exportLock.current) return;
+    if (!isAdmin || exportLock.current) return;
     exportLock.current = true;
     setExporting(true);
     try {
@@ -248,7 +251,7 @@ export default function Dashboard({ profile, signOut }) {
     }
   }
   async function backup() {
-    if (exportLock.current) return;
+    if (!isAdmin || exportLock.current) return;
     exportLock.current = true;
     setExporting(true);
     try {
@@ -453,28 +456,34 @@ export default function Dashboard({ profile, signOut }) {
             >
               Actualizar
             </button>
-            <button
-              className="btn ghost"
-              disabled={loading || !exportRows.length || exporting}
-              onClick={exportCsv}
-            >
-              Exportar CSV
-            </button>
-            <button
-              className="btn ghost"
-              disabled={loading || !exportRows.length || exporting}
-              onClick={() => void exportReport("pdf")}
-            >
-              Exportar PDF
-            </button>
-            <button
-              className="btn ghost"
-              disabled={loading || !exportRows.length || exporting}
-              onClick={() => void exportReport("xlsx")}
-            >
-              Exportar Excel
-            </button>
-            {exporting && <span role="status">Preparando exportación…</span>}
+            {isAdmin && (
+              <>
+                <button
+                  className="btn ghost"
+                  disabled={loading || !exportRows.length || exporting}
+                  onClick={exportCsv}
+                >
+                  Exportar CSV
+                </button>
+                <button
+                  className="btn ghost"
+                  disabled={loading || !exportRows.length || exporting}
+                  onClick={() => void exportReport("pdf")}
+                >
+                  Exportar PDF
+                </button>
+                <button
+                  className="btn ghost"
+                  disabled={loading || !exportRows.length || exporting}
+                  onClick={() => void exportReport("xlsx")}
+                >
+                  Exportar Excel
+                </button>
+                {exporting && (
+                  <span role="status">Preparando exportación…</span>
+                )}
+              </>
+            )}
             {isAdmin && (
               <button
                 className="btn ghost"
@@ -485,7 +494,7 @@ export default function Dashboard({ profile, signOut }) {
                 Respaldo de datos JSON
               </button>
             )}
-            {canEdit && (
+            {isAdmin && (
               <button
                 className="btn primary"
                 onClick={() => setEditing(emptyAgreement())}
