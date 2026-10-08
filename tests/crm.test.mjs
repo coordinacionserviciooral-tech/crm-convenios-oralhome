@@ -46,6 +46,11 @@ test("payload retains tariffs and activity metadata; excludes database audit fie
   ])
     assert.ok(!(key in payload));
   assert.deepEqual(row.actividades[0], payload.actividades[0]);
+  const legacy = { fecha: "", nota: "", cumplida: true };
+  assert.deepEqual(
+    agreementPayload({ ...row, actividades: [legacy] }).actividades,
+    [legacy],
+  );
 });
 test("invalid tariffs, empty company, invalid email and impossible dates are rejected", () => {
   for (const patch of [
