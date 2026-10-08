@@ -36,6 +36,7 @@ export default function Dashboard({ profile, signOut }) {
     [selectedAgreement, setSelectedAgreement] = useState(null),
     [exporting, setExporting] = useState(false);
   const exportLock = useRef(false);
+  const searchInput = useRef(null);
   const [open, setOpen] = useState(null),
     [editing, setEditing] = useState(null),
     [view, setView] = useState("convenios"),
@@ -395,16 +396,31 @@ export default function Dashboard({ profile, signOut }) {
             </button>
           </div>
           <section className="toolbar" aria-label="Filtros">
-            <label className="field search-field">
-              Buscar convenio
-              <input
-                type="search"
-                className="search"
-                placeholder="Compañía, producto, responsable, correo o actividad"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-              />
-            </label>
+            <div className="field search-field">
+              <label htmlFor="agreement-search">Buscar convenio</label>
+              <div className="search-controls">
+                <input
+                  id="agreement-search"
+                  ref={searchInput}
+                  type="search"
+                  className="search"
+                  placeholder="Compañía, producto, responsable, correo o actividad"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+                <button
+                  type="button"
+                  aria-label="Limpiar búsqueda"
+                  disabled={!query}
+                  onClick={() => {
+                    setQuery("");
+                    searchInput.current?.focus();
+                  }}
+                >
+                  Limpiar
+                </button>
+              </div>
+            </div>
             <label className="field">
               Estado
               <select
