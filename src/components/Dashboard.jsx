@@ -2,16 +2,23 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import {
   agreementsCsv,
+  csvCell,
   downloadFile,
   emptyAgreement,
   errorMessage,
   MONTHS,
   normalizeAgreement,
-  pendingActivities,
   ROLES,
   todayBogota,
   visibleAgreements,
 } from "../lib/crm";
+import {
+  organizations,
+  followups,
+  reportTables,
+  excelReport,
+  pdfReport,
+} from "../lib/reports";
 import Agreement from "./Agreement";
 import AgreementEditor from "./AgreementEditor";
 import AdminPanel from "./AdminPanel";
@@ -24,6 +31,11 @@ export default function Dashboard({ profile, signOut }) {
   const [query, setQuery] = useState(""),
     [status, setStatus] = useState("activos"),
     [month, setMonth] = useState("");
+  const [metric, setMetric] = useState("convenios"),
+    [organization, setOrganization] = useState(""),
+    [selectedAgreement, setSelectedAgreement] = useState(null),
+    [exporting, setExporting] = useState(false);
+  const exportLock = useRef(false);
   const [open, setOpen] = useState(null),
     [editing, setEditing] = useState(null),
     [view, setView] = useState("convenios"),
@@ -71,12 +83,47 @@ export default function Dashboard({ profile, signOut }) {
     };
   }, [loadRows]);
   const filtered = useMemo(
-    () => visibleAgreements(rows, query, status, month),
-    [rows, query, status, month],
+    () =>
+      visibleAgreements(rows, query, status, month).filter(
+        (r) =>
+          (!organization || r.Compañia.trim().toUpperCase() === organization) &&
+          (!selectedAgreement || r.Id === selectedAgreement),
+      ),
+    [rows, query, status, month, organization, selectedAgreement],
   );
   const active = rows.filter((r) => !r.archived_at),
-    pending = active.flatMap(pendingActivities),
+    pending = followups(active),
     today = todayBogota();
+  const groups = organizations(filtered),
+    isFollowups = ["pendientes", "vencidos"].includes(metric),
+    activities = isFollowups
+      ? followups(filtered, metric === "vencidos", today)
+      : null,
+    exportRows = isFollowups
+      ? filtered.filter((r) => activities.some((a) => a.agreement.Id === r.Id))
+      : filtered;
+  const metricTitle = {
+    convenios: "Convenios",
+    organizaciones: "Organizaciones activas",
+    pendientes: "Seguimientos pendientes",
+    vencidos: "Seguimientos vencidos",
+  }[metric];
+  function home(next = "convenios") {
+    setView("convenios");
+    setMetric(next);
+    setStatus("activos");
+    setMonth("");
+    setQuery("");
+    setOrganization("");
+    setSelectedAgreement(null);
+    setOpen(null);
+  }
+  function showAgreement(row) {
+    setMetric("convenios");
+    setOrganization("");
+    setSelectedAgreement(row.Id);
+    setOpen(row.Id);
+  }
   async function save(payload, original) {
     if (!canEdit)
       throw new Error("Tu rol permite consultar, pero no editar convenios.");
@@ -145,22 +192,96 @@ export default function Dashboard({ profile, signOut }) {
     }
   }
   function exportCsv() {
+    const csv =
+      metric === "organizaciones"
+        ? [
+            ["Organización", "Convenios activos"],
+            ...groups.map((g) => [g.name, g.agreements.length]),
+          ]
+            .map((r) => r.map(csvCell).join(";"))
+            .join("\r\n")
+        : isFollowups
+          ? (() => {
+              const t = reportTables(exportRows, activities)[2];
+              return [t.columns, ...t.data]
+                .map((r) => r.map(csvCell).join(";"))
+                .join("\r\n");
+            })()
+          : null;
     downloadFile(
-      `CRM_Oralhome_${status}_${today}.csv`,
-      agreementsCsv(filtered),
+      `CRM_Oralhome_${metric}_${status}_${today}.csv`,
+      csv === null ? agreementsCsv(exportRows) : "\ufeff" + csv,
       "text/csv;charset=utf-8",
     );
   }
-  function backup() {
-    downloadFile(
-      `CRM_Oralhome_respaldo_${today}.json`,
-      JSON.stringify(
-        { exported_at: new Date().toISOString(), records: rows },
-        null,
-        2,
-      ),
-      "application/json",
-    );
+  async function exportReport(format) {
+    if (exportLock.current) return;
+    exportLock.current = true;
+    setExporting(true);
+    try {
+      const content =
+        format === "xlsx"
+          ? await excelReport(
+              exportRows,
+              activities,
+              metric === "organizaciones",
+            )
+          : await pdfReport(
+              exportRows,
+              activities,
+              metricTitle,
+              metric === "organizaciones",
+            );
+      downloadFile(
+        `CRM_Oralhome_${metric}_${today}.${format}`,
+        content,
+        format === "xlsx"
+          ? "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          : "application/pdf",
+      );
+    } catch (error) {
+      setNotice({ error: true, text: errorMessage(error) });
+    } finally {
+      exportLock.current = false;
+      setExporting(false);
+    }
+  }
+  async function backup() {
+    if (exportLock.current) return;
+    exportLock.current = true;
+    setExporting(true);
+    try {
+      const documents = [];
+      for (let offset = 0; ; offset += 500) {
+        const { data, error } = await supabase
+          .from("agreement_documents")
+          .select("*")
+          .order("id")
+          .range(offset, offset + 499);
+        if (error) throw error;
+        documents.push(...data);
+        if (data.length < 500) break;
+      }
+      downloadFile(
+        `CRM_Oralhome_respaldo_${today}.json`,
+        JSON.stringify(
+          {
+            exported_at: new Date().toISOString(),
+            records: rows,
+            documents,
+            file_contents_included: false,
+          },
+          null,
+          2,
+        ),
+        "application/json",
+      );
+    } catch (error) {
+      setNotice({ error: true, text: errorMessage(error) });
+    } finally {
+      exportLock.current = false;
+      setExporting(false);
+    }
   }
   const showAdmin =
     isAdmin && ["usuarios", "auditoria", "alertas"].includes(view);
@@ -168,7 +289,13 @@ export default function Dashboard({ profile, signOut }) {
     <div className="app">
       <header className="header">
         <div className="brand">
-          <img alt="Oralhome" src="/LOGO-ORAL-HOME SIN FONDO.png" />
+          <button
+            className="logo-home"
+            aria-label="Ir al inicio"
+            onClick={() => home()}
+          >
+            <img alt="Oralhome" src="/LOGO-ORAL-HOME SIN FONDO.png" />
+          </button>
           <div>
             <h1>CRM de convenios</h1>
             <small>
@@ -192,7 +319,7 @@ export default function Dashboard({ profile, signOut }) {
               className={"btn " + (key === view ? "primary" : "ghost")}
               aria-current={view === key ? "page" : undefined}
               key={key}
-              onClick={() => setView(key)}
+              onClick={() => (key === "convenios" ? home() : setView(key))}
             >
               {label}
             </button>
@@ -226,11 +353,19 @@ export default function Dashboard({ profile, signOut }) {
       ) : (
         <main>
           <div className="kpis">
-            <div className="kpi">
+            <button
+              className="kpi"
+              aria-pressed={metric === "convenios"}
+              onClick={() => home()}
+            >
               <b>{active.length}</b>
               <span>Convenios activos</span>
-            </div>
-            <div className="kpi">
+            </button>
+            <button
+              className="kpi"
+              aria-pressed={metric === "organizaciones"}
+              onClick={() => home("organizaciones")}
+            >
               <b>
                 {
                   new Set(
@@ -239,17 +374,25 @@ export default function Dashboard({ profile, signOut }) {
                 }
               </b>
               <span>Organizaciones activas</span>
-            </div>
-            <div className="kpi">
+            </button>
+            <button
+              className="kpi"
+              aria-pressed={metric === "pendientes"}
+              onClick={() => home("pendientes")}
+            >
               <b>{pending.length}</b>
               <span>Seguimientos pendientes</span>
-            </div>
-            <div className="kpi">
+            </button>
+            <button
+              className="kpi"
+              aria-pressed={metric === "vencidos"}
+              onClick={() => home("vencidos")}
+            >
               <b className="overdue">
-                {pending.filter((a) => a.fecha < today).length}
+                {pending.filter((a) => a.fecha && a.fecha < today).length}
               </b>
               <span>Seguimientos vencidos</span>
-            </div>
+            </button>
           </div>
           <section className="toolbar" aria-label="Filtros">
             <label className="field search-field">
@@ -296,14 +439,34 @@ export default function Dashboard({ profile, signOut }) {
             </button>
             <button
               className="btn ghost"
-              disabled={loading || !filtered.length}
+              disabled={loading || !exportRows.length || exporting}
               onClick={exportCsv}
             >
               Exportar CSV
             </button>
+            <button
+              className="btn ghost"
+              disabled={loading || !exportRows.length || exporting}
+              onClick={() => void exportReport("pdf")}
+            >
+              Exportar PDF
+            </button>
+            <button
+              className="btn ghost"
+              disabled={loading || !exportRows.length || exporting}
+              onClick={() => void exportReport("xlsx")}
+            >
+              Exportar Excel
+            </button>
+            {exporting && <span role="status">Preparando exportación…</span>}
             {isAdmin && (
-              <button className="btn ghost" disabled={loading} onClick={backup}>
-                Respaldo completo JSON
+              <button
+                className="btn ghost"
+                disabled={loading || exporting}
+                onClick={() => void backup()}
+                title="Incluye datos y referencias de documentos. Los archivos se descargan por separado."
+              >
+                Respaldo de datos JSON
               </button>
             )}
             {canEdit && (
@@ -315,14 +478,77 @@ export default function Dashboard({ profile, signOut }) {
               </button>
             )}
             <span className="muted">
-              {filtered.length} resultado(s) ·{" "}
-              {rows.filter((r) => !!r.archived_at).length} archivado(s)
+              {isFollowups
+                ? activities.length
+                : metric === "organizaciones"
+                  ? groups.length
+                  : filtered.length}{" "}
+              resultado(s) · {rows.filter((r) => !!r.archived_at).length}{" "}
+              archivado(s)
             </span>
+          </div>
+          <div className="inline">
+            <h2>
+              {metricTitle}
+              {organization ? ` · ${groups[0]?.name || organization}` : ""}
+            </h2>
+            {(organization || selectedAgreement || metric !== "convenios") && (
+              <button className="btn ghost" onClick={() => home()}>
+                Ver todos los convenios
+              </button>
+            )}
           </div>
           {loading ? (
             <p className="card" role="status">
               Cargando convenios…
             </p>
+          ) : metric === "organizaciones" ? (
+            <section className="grid" aria-label="Organizaciones activas">
+              {groups.map((g) => (
+                <article className="card" key={g.key}>
+                  <h3>{g.name}</h3>
+                  <p>{g.agreements.length} convenio(s)</p>
+                  <button
+                    className="btn primary"
+                    onClick={() => {
+                      setMetric("convenios");
+                      setOrganization(g.key);
+                      setOpen(null);
+                    }}
+                  >
+                    Ver convenios de {g.name}
+                  </button>
+                </article>
+              ))}
+              {!groups.length && (
+                <p className="card">No hay organizaciones con estos filtros.</p>
+              )}
+            </section>
+          ) : isFollowups ? (
+            <section className="grid" aria-label={metricTitle}>
+              {activities.map((a) => (
+                <article
+                  className="card"
+                  key={`${a.agreement.Id}:${a.id || a.index}`}
+                >
+                  <h3>{a.agreement.Compañia}</h3>
+                  <p>{a.agreement.Producto}</p>
+                  <b className={a.fecha && a.fecha < today ? "overdue" : ""}>
+                    {a.fecha || "Sin fecha"}
+                  </b>
+                  <p>{a.nota || "Sin nota"}</p>
+                  <button
+                    className="btn primary"
+                    onClick={() => showAgreement(a.agreement)}
+                  >
+                    Ver convenio
+                  </button>
+                </article>
+              ))}
+              {!activities.length && (
+                <p className="card">No hay seguimientos con estos filtros.</p>
+              )}
+            </section>
           ) : (
             <div className="grid">
               {filtered.map((row) => (

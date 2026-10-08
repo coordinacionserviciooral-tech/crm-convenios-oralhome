@@ -6,6 +6,10 @@ const schema = await readFile(
   new URL("../supabase/schema.sql", import.meta.url),
   "utf8",
 );
+const documentSchema = await readFile(
+  new URL("../supabase/documents.sql", import.meta.url),
+  "utf8",
+);
 const ids = {
   admin: "00000000-0000-4000-8000-000000000001",
   commercial: "00000000-0000-4000-8000-000000000002",
@@ -187,6 +191,143 @@ test("cron uses the Vault digest and never exposes it to CRM users", async () =>
     (await db.query("select public.crm_cron_secret_digest() as digest")).rows[0]
       .digest,
     createHash("sha256").update("test-secret").digest("hex"),
+  );
+  await db.close();
+});
+
+test("documents remain private; consultation cannot upload and archived attachments cannot be permanently deleted", async () => {
+  const db = await setup();
+  await db.exec(`create schema storage; create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint);
+ create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text,name text,owner_id text,metadata jsonb,unique(bucket_id,name));
+ alter table storage.objects enable row level security;
+ grant usage on schema storage to anon,authenticated,service_role;
+ grant select,insert,delete on storage.objects to authenticated; grant select on storage.objects to anon; grant all on storage.objects to service_role;`);
+  await db.exec(documentSchema);
+  await db.exec(documentSchema);
+  const id = "00000000-0000-4000-8000-000000000010",
+    path = `1/${id}/contrato.pdf`;
+  await asUser(db, "commercial");
+  await db.query(
+    `insert into storage.objects(bucket_id,name,owner_id,metadata) values('crm-convenios-documentos',$1,$2,'{"size":100}')`,
+    [path, ids.commercial],
+  );
+  await db.query(
+    `insert into agreement_documents(id,agreement_id,original_name,storage_path,media_type,size_bytes) values($1,1,'contrato.pdf',$2,'application/pdf',100)`,
+    [id, path],
+  );
+  assert.equal(
+    (await db.query("select count(*)::integer n from agreement_documents"))
+      .rows[0].n,
+    1,
+  );
+  await asUser(db, "consult");
+  assert.equal(
+    (await db.query("select count(*)::integer n from storage.objects")).rows[0]
+      .n,
+    1,
+  );
+  await assert.rejects(
+    db.query(
+      `insert into storage.objects(bucket_id,name,owner_id,metadata) values('crm-convenios-documentos',$1,$2,'{"size":100}')`,
+      ["1/00000000-0000-4000-8000-000000000011/test.pdf", ids.consult],
+    ),
+    /row-level security/,
+  );
+  await asUser(db, "blocked");
+  assert.equal(
+    (await db.query("select count(*)::integer n from agreement_documents"))
+      .rows[0].n,
+    0,
+  );
+  assert.equal(
+    (await db.query("select count(*)::integer n from storage.objects")).rows[0]
+      .n,
+    0,
+  );
+  await asUser(db, "admin");
+  await db.query(
+    "update agreement_documents set archived_at=now() where id=$1",
+    [id],
+  );
+  await asUser(db, "commercial");
+  assert.equal(
+    (await db.query("select count(*)::integer n from agreement_documents"))
+      .rows[0].n,
+    0,
+  );
+  assert.equal(
+    (
+      await db.query("delete from storage.objects where name=$1 returning *", [
+        path,
+      ])
+    ).rows.length,
+    0,
+  );
+  await asUser(db, "admin");
+  assert.equal(
+    (await db.query("select count(*)::integer n from storage.objects")).rows[0]
+      .n,
+    1,
+  );
+  await db.query(
+    "update agreement_documents set archived_at=null where id=$1",
+    [id],
+  );
+  assert.deepEqual(
+    (
+      await db.query(
+        "select action from audit_logs where entity='agreement_documents' order by id",
+      )
+    ).rows.map((r) => r.action),
+    ["UPLOAD_DOCUMENT", "ARCHIVE_DOCUMENT", "RESTORE_DOCUMENT"],
+  );
+  await asUser(db, "anon");
+  await assert.rejects(
+    db.query("select * from agreement_documents"),
+    /permission denied/,
+  );
+  assert.equal(
+    (await db.query("select count(*)::integer n from storage.objects")).rows[0]
+      .n,
+    0,
+  );
+  await db.close();
+});
+
+test("document links reject ownership theft, mismatched sizes and archived agreement uploads; cleanup only removes unlinked uploads", async () => {
+  const db = await setup();
+  await db.exec(`create schema storage; create table storage.buckets(id text primary key,name text,public boolean,file_size_limit bigint);
+ create table storage.objects(id uuid primary key default gen_random_uuid(),bucket_id text,name text,owner_id text,metadata jsonb,unique(bucket_id,name));
+ alter table storage.objects enable row level security;
+ grant usage on schema storage to authenticated,service_role; grant select,insert,delete on storage.objects to authenticated;`);
+  await db.exec(documentSchema);
+  const id = "00000000-0000-4000-8000-000000000020",
+    path = `1/${id}/contrato.pdf`;
+  await asUser(db, "admin");
+  await db.query(
+    `insert into storage.objects(bucket_id,name,owner_id,metadata) values('crm-convenios-documentos',$1,$2,'{"size":100}')`,
+    [path, ids.admin],
+  );
+  await asUser(db, "commercial");
+  const insert = `insert into agreement_documents(id,agreement_id,original_name,storage_path,media_type,size_bytes) values($1,1,'contrato.pdf',$2,'application/pdf',$3)`;
+  await assert.rejects(db.query(insert, [id, path, 100]), /pertenece/);
+  await asUser(db, "admin");
+  await assert.rejects(db.query(insert, [id, path, 101]), /pertenece/);
+  assert.equal(
+    (
+      await db.query("delete from storage.objects where name=$1 returning *", [
+        path,
+      ])
+    ).rows.length,
+    1,
+  );
+  await db.exec('update public."Aliados" set archived_at=now()');
+  await assert.rejects(
+    db.query(
+      `insert into storage.objects(bucket_id,name,owner_id,metadata) values('crm-convenios-documentos',$1,$2,'{"size":100}')`,
+      [path, ids.admin],
+    ),
+    /row-level security/,
   );
   await db.close();
 });

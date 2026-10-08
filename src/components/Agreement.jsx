@@ -1,4 +1,5 @@
 import { money, pendingActivities, todayBogota } from "../lib/crm";
+import AgreementDocuments from "./AgreementDocuments";
 export default function Agreement({
   row,
   expanded,
@@ -108,6 +109,7 @@ export default function Agreement({
               </button>
             )}
           </div>
+          <AgreementDocuments row={row} canEdit={canEdit} isAdmin={isAdmin} />
         </div>
       )}
     </article>
