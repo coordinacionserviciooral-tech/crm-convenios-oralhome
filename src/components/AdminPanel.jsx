@@ -204,9 +204,11 @@ export default function AdminPanel({ view, profile }) {
           Renovación: avisos a 2 y 1 meses, al inicio del mes, y 8, 3 y 1 días
           calendario antes. Gestión: 8, 3 y 1 días calendario antes.
           Seguimientos pendientes: 8 días de lunes a viernes antes, sin
-          calendario de festivos. Horarios: 08:00 y 15:00 de Colombia. Cada
-          horario tiene su propio envío. Los fallos quedan registrados para
-          reintento.
+          calendario de festivos. Un único correo resumen a
+          coordinadordeservicio@oralhome.com.co a las 08:00 y 15:00 de Colombia.
+          La renovación se repite diariamente hasta cambiar o agregar una
+          tarifa; los seguimientos, hasta marcarlos como cumplidos. Los fallos
+          se retoman en el siguiente horario, sin envíos entre horas.
         </p>
       )}
       {loading ? (
@@ -250,7 +252,11 @@ export default function AdminPanel({ view, profile }) {
                   {view === "usuarios" ? (
                     <>
                       <td>
-                        <UserName user={row} disabled={!!busy} onSave={change} />
+                        <UserName
+                          user={row}
+                          disabled={!!busy}
+                          onSave={change}
+                        />
                       </td>
                       <td>{row.email}</td>
                       <td>

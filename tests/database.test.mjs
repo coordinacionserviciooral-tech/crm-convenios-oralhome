@@ -331,3 +331,40 @@ test("document links reject ownership theft, mismatched sizes and archived agree
   );
   await db.close();
 });
+
+test("tariff acknowledgement is server controlled and only additions or value changes stop renewal", async () => {
+  const db = await setup();
+  try {
+    const migration = await readFile(
+      new URL("../supabase/renewal-alerts.sql", import.meta.url),
+      "utf8",
+    );
+    await db.exec(migration);
+    await db.exec(migration);
+    await db.exec(
+      `update public."Aliados" set "Responsable_cliente"='New contact',tariff_reviewed_at=now();`,
+    );
+    assert.equal(
+      (await db.query(`select tariff_reviewed_at from public."Aliados"`))
+        .rows[0].tariff_reviewed_at,
+      null,
+    );
+    await db.exec(
+      `update public."Aliados" set tarifa=tarifa || '{"2027":140}'::jsonb;`,
+    );
+    const acknowledged = (
+      await db.query(`select tariff_reviewed_at from public."Aliados"`)
+    ).rows[0].tariff_reviewed_at;
+    assert.ok(acknowledged);
+    await db.exec(
+      `update public."Aliados" set tarifa=tarifa-'2017',tariff_reviewed_at=null;`,
+    );
+    assert.deepEqual(
+      (await db.query(`select tariff_reviewed_at from public."Aliados"`))
+        .rows[0].tariff_reviewed_at,
+      acknowledged,
+    );
+  } finally {
+    await db.close();
+  }
+});
