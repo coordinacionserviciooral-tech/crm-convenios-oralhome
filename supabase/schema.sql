@@ -142,7 +142,7 @@ create policy crm_profile_update on public.profiles for update to authenticated
 create policy crm_agreement_read on public."Aliados" for select to authenticated
   using(public.my_role() is not null);
 create policy crm_agreement_insert on public."Aliados" for insert to authenticated
-  with check(public.my_role() in ('administrador','comercial'));
+  with check(public.my_role() = 'administrador');
 create policy crm_agreement_update on public."Aliados" for update to authenticated
   using(public.my_role() = 'administrador' or (public.my_role() = 'comercial' and archived_at is null))
   with check(public.my_role() = 'administrador' or (public.my_role() = 'comercial' and archived_at is null));
